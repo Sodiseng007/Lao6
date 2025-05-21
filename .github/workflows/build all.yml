@@ -48,7 +48,7 @@ jobs:
     with:
       KERNEL_NAME: ${{ github.event.inputs.kernel_name || '-android15-8-g013ec21bba94-abogki383916444' }}
 
-        oneplus_13_no_kpm:
+  oneplus_13_no_kpm:
     if: ${{ github.event.inputs.oneplus_13_no_kpm == 'true' }}
     uses: ./.github/workflows/oneplus_13_no_kpm.yml
     secrets: inherit
