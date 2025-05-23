@@ -229,7 +229,7 @@ jobs:
       - name: Prepare AnyKernel3 Packages
         run: |
          cd kernel_workspace/kernel_platform/dist
-         git clone h://ttpsgithub.com/Sodiseng007/AnyKernel3.git AnyKernel3-no_kpm --depth=1
+         git clone https://github.com/Sodiseng007/AnyKernel3.git AnyKernel3-no_kpm --depth=1
          rm -rf AnyKernel3-no_kpm/.git
          rm -f AnyKernel3-no_kpm/push.sh
          cp Image AnyKernel3-no_kpm/
