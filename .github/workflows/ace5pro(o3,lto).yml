@@ -46,6 +46,11 @@ on:
         required: false
         default: 'Tue Dec 17 23:36:49 UTC 2024'
         type: string
+      ENABLE_LTO:
+        description: '启用 LTO'
+        required: false
+        default: false
+        type: boolean
 jobs:
   build:
     runs-on: ubuntu-latest
