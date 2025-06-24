@@ -1,0 +1,181 @@
+name: ace5pro测试
+
+on:
+  workflow_dispatch:
+    inputs:
+      CPU:
+        description: "分支"
+        required: true
+        default: 'sm8750'
+      FEIL:
+        description: "配置文件"
+        required: true
+        default: 'oneplus_ace5_pro'
+      ANDROID_VERSION:
+        description: "安卓版本"
+        required: true
+        default: 'android15'
+      KERNEL_VERSION:
+        description: "内核版本"
+        required: true
+        default: '6.6'
+      ENABLE_KPM:
+        description: "启用KPM"
+        required: false
+        default: false
+        type: boolean
+      ENABLE_LTO:
+        description: "启用LTO"
+        required: false
+        default: false
+        type: boolean
+      KERNEL_NAME:
+        description: "内核名称"
+        required: false
+        default: '-android15-gki'
+      local_version:
+        description: "内核后缀"
+        required: false
+        default: '-4k'
+      remove_default_4k:
+        description: '是否删除默认的 -4k 后缀？'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.TOKEN }}
+      CCACHE_DIR: /home/runner/.ccache
+      CCACHE_MAXSIZE: 8G
+      CCACHE_BASEDIR: ${{ github.workspace }}
+    steps:
+
+      - name: Maximize disk space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          remove-dotnet: 'true'
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup ccache
+        run: |
+          sudo apt-get update && sudo apt-get install -y ccache libelf-dev
+          echo "/usr/lib/ccache" >> $GITHUB_PATH
+          echo "CCACHE_NOHASHDIR=true" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=true" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=%compiler% -dumpmachine; %compiler% -dumpversion" >> $GITHUB_ENV
+
+      - name: Restore ccache
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/gki_defconfig', '**/Makefile') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
+
+      - name: Init & sync repo
+        run: |
+          mkdir kernel_workspace && cd kernel_workspace
+          repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
+          repo sync -c -j2 --no-tags
+
+      - name: Setup KernelSU
+        run: |
+          cd kernel_workspace/kernel_platform
+          curl -LSs https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh | bash -s susfs-main
+          cd KernelSU
+          export KSU_VERSION=$(expr $(git rev-list --count main) + 10606)
+          echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+          sed -i "s/DKSU_VERSION=12800/DKSU_VERSION=$KSU_VERSION/" kernel/Makefile
+
+      - name: Apply SUSFS & patches
+        run: |
+          cd kernel_workspace
+          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}
+          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU_patch.git
+          git clone https://${{ secrets.TOKEN }}@github.com/Sodiseng007/1234.git
+          cd kernel_platform
+          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch ./common/ || true
+          cd common
+          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch || true
+          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch || true
+          patch -p1 < 50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch || true
+          patch -p1 -F 3 < ../../SukiSU_patch/hooks/syscall_hooks.patch || true
+          patch -p1 -F 3 < ../../1234/boot.patch || true
+
+      - name: Apply LZ4KD Patch
+        run: |
+          cd kernel_workspace/kernel_platform/common
+          PATCH_FILE=../../SukiSU_patch/other/zram/zram_patch/${{ inputs.KERNEL_VERSION }}/lz4kd.patch
+          if [[ -f "$PATCH_FILE" ]]; then
+            patch -p1 -F 3 < "$PATCH_FILE"
+          fi
+
+      - name: Add kernel config
+        run: |
+          cd kernel_workspace/kernel_platform
+          CONFIG=./common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU=y" >> $CONFIG
+          echo "CONFIG_KSU_SUSFS=y" >> $CONFIG
+          echo "CONFIG_CRYPTO_LZ4HC=y" >> $CONFIG
+          echo "CONFIG_CRYPTO_LZ4K=y" >> $CONFIG
+          echo "CONFIG_CRYPTO_LZ4KD=y" >> $CONFIG
+          echo "CONFIG_CRYPTO_842=y" >> $CONFIG
+          echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.local_version }}\"" >> $CONFIG
+          if ${{ inputs.remove_default_4k }}; then sed -i 's/-4k//' $CONFIG; fi
+
+      - name: 启用KPM
+        if: ${{ inputs.ENABLE_KPM }}
+        run: |
+          echo "CONFIG_KPM=y" >> kernel_workspace/kernel_platform/common/arch/arm64/configs/gki_defconfig
+
+      - name: 启用LTO
+        if: ${{ inputs.ENABLE_LTO }}
+        run: |
+          CONFIG=kernel_workspace/kernel_platform/common/arch/arm64/configs/gki_defconfig
+          echo "CONFIG_LTO_CLANG=y" >> $CONFIG
+          echo "CONFIG_LTO_CLANG_THIN=y" >> $CONFIG
+
+      - name: 构建内核
+        run: |
+          cd kernel_workspace/kernel_platform/common
+          export PATH="../../prebuilts/clang/host/linux-x86/clang-r510928/bin:/usr/lib/ccache:$PATH"
+          export MAKE_ARGS="LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang O=out"
+          make -j2 $MAKE_ARGS gki_defconfig
+          make -j2 $MAKE_ARGS all
+          cp out/arch/arm64/boot/Image ../dist/
+
+      - name: Patch oImage (for KPM)
+        if: ${{ inputs.ENABLE_KPM }}
+        run: |
+          cd kernel_workspace/kernel_platform/dist
+          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
+          chmod +x patch_linux && ./patch_linux
+          mv oImage Image
+
+      - name: Package AnyKernel3
+        run: |
+          cd kernel_workspace/kernel_platform/dist
+          git clone --depth=1 https://github.com/egcd123/AnyKernel3.git AnyKernel3
+          rm -rf AnyKernel3/.git
+          cp Image AnyKernel3/
+
+      - name: Upload AnyKernel3
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnyKernel3_oneplus_ace5pro_${{ env.KSUVER }}_sukisu
+          path: kernel_workspace/kernel_platform/dist/AnyKernel3/*
+
+      - name: Save ccache
+        if: always()
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/gki_defconfig', '**/Makefile') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-
