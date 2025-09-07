@@ -135,7 +135,7 @@ jobs:
          set -e
 
          cd kernel_workspace
-         git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}
+         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}
          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU_patch.git
          git clone https://$TOKEN@github.com/Sodiseng007/1234.git
          cd kernel_platform
