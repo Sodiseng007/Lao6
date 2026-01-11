@@ -1,4 +1,4 @@
-name: ace5pro(sukisu）
+name: 一加15(sukisu）
 on:
   workflow_dispatch:
     inputs:
