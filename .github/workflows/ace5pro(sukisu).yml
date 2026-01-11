@@ -44,7 +44,7 @@ on:
       sukisu_tag:
         description: "自定义版本来源后缀（如:见清）"
         required: false
-        default: "见清🤣👉🏻🤡"
+        default: "老六🤣👉🏻🤡"
       UNICODE_BYPASS:
         type: boolean
         description: "是否添加Unicode零宽绕过修复与内存优化补丁？"
@@ -137,7 +137,7 @@ jobs:
          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/tmp-builtin/kernel/setup.sh" | bash -s tmp-builtin
          cd KernelSU
          # 自定义后缀（支持 emoji）
-         TAG_SUFFIX="见清🤣👉🏻🤡"
+         TAG_SUFFIX="老六🤣👉🏻🤡"
          # 注入自定义版本字符串（kernel/Kbuild）
          perl -0777 -i -pe 's/define get_ksu_version_full\n.*?\nendef/define get_ksu_version_full\nv\$(KSU_VERSION_API)-sukisu-\$(KSU_VERSION)-by-'"${TAG_SUFFIX}"'\nendef/s' kernel/Kbuild
          echo "✅ Injected: v\$(KSU_VERSION_API)-sukisu-\$(KSU_VERSION)-by-${TAG_SUFFIX}"
@@ -156,8 +156,8 @@ jobs:
          git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}
          git clone --depth=1 https://github.com/SukiSU-Ultra/SukiSU_patch.git
          git clone https://github.com/egcd521/kernel_patches.git
-         git clone https://$TOKEN@github.com/egcd521/111.git
-         git clone https://github.com/egcd521/egcd.git
+         git clone https://$TOKEN@github.com/Sodiseng007/1234.git
+         git clone https://github.com/Sodiseng007/Lao6.git
          cd kernel_platform
          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch ./common/ || true
          mkdir -p ./common/fs ./common/include/linux ./common/lib ./common/crypto
@@ -168,7 +168,7 @@ jobs:
          cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib || true
          cp -r ../SukiSU_patch/other/zram/lz4k/crypto/* ./common/crypto || true
          cp -r ../SukiSU_patch/other/zram/lz4k_oplus ./common/lib/ || true
-         cp ../111/boot.patch ./common/
+         cp ../1234/boots.patch ./common/
          cd ./common
          PATCH_FILE=50_add_susfs_in_gki-${{ inputs.ANDROID_VERSION }}-${{ inputs.KERNEL_VERSION }}.patch
          if [[ -f "$PATCH_FILE" ]]; then
